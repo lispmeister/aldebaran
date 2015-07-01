@@ -13,40 +13,44 @@ import time
 import sys
 import argparse
 import json
+import random
 
-def create_purchase_request():
+def create_purchase_request(limit):
   fields = {}
   fields['id'] = str(uuid.uuid4())
-  fields['#shares'] = 100
+  fields['#shares'] = limit
   fields['client'] = 'Goldman'
   fields['stock'] = 'AAPL'
   return fields
 
-def create_purchase(order_id):
+def create_purchase(order_id, shares):
   fields = {}
   fields['id'] = str(uuid.uuid4())
   fields['initial_order_id'] = order_id
-  fields['#shares'] = 30
+  fields['#shares'] = shares
   fields['client'] = 'Goldman'
   fields['stock'] = 'AAPL'
   return fields
 
-def publish_purchase_request(channel):
-    pr = create_purchase_request()
+def publish_purchase_request(channel, pr):
     print ('Purchase Request: %s' % json.dumps(pr))
     channel.basic_publish(exchange='Aldebaran.Trade_Data',
                           routing_key='', body=json.dumps(pr))
-    return pr['id']
 
-def publish_purchase(channel, order_id):
-    p  = create_purchase(order_id)
+def publish_purchase(channel, p):
     print ('Purchase: %s' % json.dumps(p))
     channel.basic_publish(exchange='Aldebaran.Trade_Data',
                           routing_key='', body=json.dumps(p))
 
 def publish(channel):
-    order_id = publish_purchase_request(channel)
-    publish_purchase(channel, order_id)
+    limit = (random.randint(50, 100))
+    amounts = [int(limit / 2 * random.random()) for i in xrange(4)]
+    pr = create_purchase_request(limit)
+    publish_purchase_request(channel, pr)
+    order_id = pr['id']
+    for a in amounts:
+         p = create_purchase(order_id, a)
+         publish_purchase(channel, p)
 
 def main():
     parser = argparse.ArgumentParser(
