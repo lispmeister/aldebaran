@@ -35,12 +35,12 @@ def create_purchase(order_id, shares):
 def publish_purchase_request(channel, pr):
     print ('Purchase Request: %s' % json.dumps(pr))
     channel.basic_publish(exchange='Aldebaran.Trade_Data',
-                          routing_key='', body=json.dumps(pr))
+                          routing_key='Aldebaran.Trade_Data', body=json.dumps(pr))
 
 def publish_purchase(channel, p):
     print ('Purchase: %s' % json.dumps(p))
     channel.basic_publish(exchange='Aldebaran.Trade_Data',
-                          routing_key='', body=json.dumps(p))
+                          routing_key='Aldebaran.Trade_Data', body=json.dumps(p))
 
 def publish(channel):
     limit = (random.randint(50, 100))
