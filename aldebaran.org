@@ -426,162 +426,262 @@ pip install arrow
 
 *** Create the exchanges and queues
 
- #+NAME: declare
- #+BEGIN_SRC python :tangle declare.py :shebang "#!/usr/bin/env python" :padline no
- # This file was auto-generated via org-babel-tangle in Emacs
- # Do not modify this file manually. Instead modify the source
- # in aldebaran.org and re-run org-babel-tangle
- #
- # Usage: ./declare.py -s localhost 
- #
+#+NAME: declare
+#+BEGIN_SRC python :tangle declare.py :shebang "#!/usr/bin/env python" :padline no
+# This file was auto-generated via org-babel-tangle in Emacs
+# Do not modify this file manually. Instead modify the source
+# in aldebaran.org and re-run org-babel-tangle
+#
+# Usage: ./declare.py -s localhost 
+#
 
- import pika
- import uuid
- import arrow
- import time
- import sys
- import argparse
+import pika
+import uuid
+import arrow
+import time
+import sys
+import argparse
 
- def declare_exchanges(channel):
-     channel.exchange_declare(exchange='Aldebaran.Trade_Data', 
-                              exchange_type='direct', durable=True)
-     channel.exchange_declare(exchange='Aldebaran.Purchase_Request', 
-                              exchange_type='direct', durable=True)
-     channel.exchange_declare(exchange='Aldebaran.Purchase', 
-                              exchange_type='topic', durable=True)
-     channel.exchange_declare(exchange='Aldebaran.Alert', 
-                              exchange_type='direct', durable=True)
+def declare_exchanges(channel):
+  channel.exchange_declare(exchange='Aldebaran.Trade_Data', 
+                           exchange_type='direct', durable=True)
+  channel.exchange_declare(exchange='Aldebaran.Purchase_Request', 
+                           exchange_type='direct', durable=True)
+  channel.exchange_declare(exchange='Aldebaran.Purchase', 
+                           exchange_type='topic', durable=True)
+  channel.exchange_declare(exchange='Aldebaran.Alert', 
+                           exchange_type='direct', durable=True)
 
- def declare_queues(channel):
-     channel.queue_declare(queue='Aldebaran.Trade_Data', durable=True)
-     channel.queue_declare(queue='Aldebaran.Purchase_Request', durable=True)
-     channel.queue_declare(queue='Aldebaran.Purchase', durable=True)
-     channel.queue_declare(queue='Aldebaran.Alert', durable=True)
+def declare_queues(channel):
+  channel.queue_declare(queue='Aldebaran.Trade_Data', durable=True)
+  channel.queue_declare(queue='Aldebaran.Purchase_Request', durable=True)
+  channel.queue_declare(queue='Aldebaran.Purchase', durable=True)
+  channel.queue_declare(queue='Aldebaran.Alert', durable=True)
 
- def bind_queues(channel):
-     channel.queue_bind('Aldebaran.Trade_Data', 'Aldebaran.Trade_Data' , 
-       routing_key=None, nowait=False, arguments=None)
-     channel.queue_bind('Aldebaran.Purchase_Request', 'Aldebaran.Purchase_Request' , 
-       routing_key=None, nowait=False, arguments=None)
-     channel.queue_bind('Aldebaran.Purchase', 'Aldebaran.Purchase' , 
-       routing_key=None, nowait=False, arguments=None)
-     channel.queue_bind('Aldebaran.Alert', 'Aldebaran.Alert' , 
-       routing_key=None, nowait=False, arguments=None)
+def bind_queues(channel):
+  channel.queue_bind('Aldebaran.Trade_Data', 'Aldebaran.Trade_Data' , 
+                     routing_key=None, nowait=False, arguments=None)
+  channel.queue_bind('Aldebaran.Purchase_Request', 'Aldebaran.Purchase_Request' , 
+                     routing_key=None, nowait=False, arguments=None)
+  channel.queue_bind('Aldebaran.Purchase', 'Aldebaran.Purchase' , 
+                     routing_key=None, nowait=False, arguments=None)
+  channel.queue_bind('Aldebaran.Alert', 'Aldebaran.Alert' , 
+                     routing_key=None, nowait=False, arguments=None)
 
- def main():
-     parser = argparse.ArgumentParser(
-              description='Declare exchanges and queues.')
-     parser.add_argument('-s', metavar='rabbitmq', default='localhost',
-                         help='The IP or DNS name of the RabbitMq server')
-     args = parser.parse_args()
-     myrabbit = args.s
-     # connect to RabbitMq
-     try:
-         connection = pika.BlockingConnection(
-                      pika.ConnectionParameters(host=myrabbit,heartbeat_interval=20))
-     except Exception as err:
-         print('Cant connect to RabbitMq. Reason: %s' % err)
-         exit(1)
-     channel = connection.channel()
-     print 'Declaring exchanges and queues on the RabbitMq server.'
-     declare_exchanges(channel)
-     declare_queues(channel)
-     bind_queues(channel)
-     channel.close()
-     connection.close()
+def main():
+  parser = argparse.ArgumentParser(
+           description='Declare exchanges and queues.')
+  parser.add_argument('-s', metavar='rabbitmq', default='localhost',
+                      help='The IP or DNS name of the RabbitMq server')
+  args = parser.parse_args()
+  myrabbit = args.s
+  # connect to RabbitMq
+  try:
+    connection = pika.BlockingConnection(
+                 pika.ConnectionParameters(host=myrabbit,heartbeat_interval=20))
+  except Exception as err:
+    print('Cant connect to RabbitMq. Reason: %s' % err)
+    exit(1)
+  channel = connection.channel()
+  print 'Declaring exchanges and queues on the RabbitMq server.'
+  declare_exchanges(channel)
+  declare_queues(channel)
+  bind_queues(channel)
+  channel.close()
+  connection.close()
 
- if __name__ == "__main__":
-     main()
- #+END_SRC
-
-
-
+if __name__ == "__main__":
+  main()
+#+END_SRC
 
 *** Publisher
 We start with a very simple publisher process. To simplify initial
 debugging we publishes with a frequency of 1Hz.
 
- #+NAME: trade_data_source
- #+BEGIN_SRC python :tangle trade_data_source.py :shebang "#!/usr/bin/env python" :padline no
+#+NAME: trade_data_source
+#+BEGIN_SRC python :tangle trade_data_source.py :shebang "#!/usr/bin/env python" :padline no
+#!/usr/bin/env python
+# This file was auto-generated via org-babel-tangle in Emacs
+# Do not modify this file manually. Instead modify the source
+# in aldebaran.org and re-run org-babel-tangle
+#
+# Usage: ./trade_data_source.py -s localhost 
+#
+
+import pika
+import uuid
+import arrow
+import time
+import sys
+import argparse
+import json
+import random
+
+def create_purchase_request(limit):
+  fields = {}
+  fields['id'] = str(uuid.uuid4())
+  fields['#shares'] = limit
+  fields['client'] = 'Goldman'
+  fields['stock'] = 'AAPL'
+  return fields
+
+def create_purchase(order_id, shares):
+  fields = {}
+  fields['id'] = str(uuid.uuid4())
+  fields['initial_order_id'] = order_id
+  fields['#shares'] = shares
+  fields['client'] = 'Goldman'
+  fields['stock'] = 'AAPL'
+  return fields
+
+def publish_purchase_request(channel, pr):
+  print ('Purchase Request: %s' % json.dumps(pr))
+  channel.basic_publish(exchange='Aldebaran.Trade_Data',
+                        routing_key='Aldebaran.Trade_Data', body=json.dumps(pr))
+
+def publish_purchase(channel, p):
+  print ('Purchase: %s' % json.dumps(p))
+  channel.basic_publish(exchange='Aldebaran.Trade_Data',
+                        routing_key='Aldebaran.Trade_Data', body=json.dumps(p))
+
+def publish(channel):
+  limit = (random.randint(50, 100))
+  amounts = [int(limit / 2 * random.random()) for i in xrange(4)]
+  pr = create_purchase_request(limit)
+  publish_purchase_request(channel, pr)
+  order_id = pr['id']
+  for a in amounts:
+    p = create_purchase(order_id, a)
+    publish_purchase(channel, p)
+
+def main():
+  parser = argparse.ArgumentParser(
+           description='Loop sending events to RabbitMq with at a rate of 1Hz.')
+  parser.add_argument('-s', metavar='rabbitmq', default='localhost',
+                      help='The IP or DNS name of the RabbitMq server')
+  args = parser.parse_args()
+  myrabbit = args.s
+  # connect to RabbitMq
+  try:
+    connection = pika.BlockingConnection(
+                 pika.ConnectionParameters(host=myrabbit,heartbeat_interval=20))
+  except Exception as err:
+    print('Cant connect to RabbitMq. Reason: %s' % err)
+    exit(1)
+  channel = connection.channel()
+  print 'Sending event to RabbitMq server. To exit press CTRL+C.'
+  while ( 1 ):
+    publish(channel)
+    time.sleep( 1 )
+  channel.close()
+  connection.close()
+
+if __name__ == "__main__":
+  main()
+#+END_SRC
+
+*** Event Router
+
+ #+NAME: event-router
+ #+BEGIN_SRC python :tangle event-router.py :shebang "#!/usr/bin/env python" :padline no
  # This file was auto-generated via org-babel-tangle in Emacs
  # Do not modify this file manually. Instead modify the source
  # in aldebaran.org and re-run org-babel-tangle
  #
- # Usage: ./trade_data_source.py -s localhost 
+ # Usage: ./event-router.py -s localhost
  #
 
  import pika
- import uuid
  import arrow
- import time
  import sys
- import argparse
+ import argparse 
  import json
- import random
 
- def create_purchase_request(limit):
-   fields = {}
-   fields['id'] = str(uuid.uuid4())
-   fields['#shares'] = limit
-   fields['client'] = 'Goldman'
-   fields['stock'] = 'AAPL'
-   return fields
+ def keyCheck(arr, key):
+   """If the key can be found in the dictionary
+      we return the first element otherwise None.
+   """
+   if key in arr.keys():
+     return arr[key]
+   else:
+     return None
 
- def create_purchase(order_id, shares):
-   fields = {}
-   fields['id'] = str(uuid.uuid4())
-   fields['initial_order_id'] = order_id
-   fields['#shares'] = shares
-   fields['client'] = 'Goldman'
-   fields['stock'] = 'AAPL'
-   return fields
+ def keyExists(arr, key):
+   """Return True if the dictionary contains the key,
+      return false otherwise
+   """
+   if (keyCheck(arr, key)) == None:
+     return False
+   else:
+     return True
 
- def publish_purchase_request(channel, pr):
-     print ('Purchase Request: %s' % json.dumps(pr))
-     channel.basic_publish(exchange='Aldebaran.Trade_Data',
-                           routing_key='Aldebaran.Trade_Data', body=json.dumps(pr))
+ def isPurchaseEvent(event):
+   """If the event contains a key named 'initial_order_id' it is
+      a purchase event and we return True. Otherwise  it is a
+      purchase request event and we return False.
+   """
+   if (keyExists(event, 'initial_order_id')):
+     return True
+   else:
+     return False
 
- def publish_purchase(channel, p):
-     print ('Purchase: %s' % json.dumps(p))
-     channel.basic_publish(exchange='Aldebaran.Trade_Data',
-                           routing_key='Aldebaran.Trade_Data', body=json.dumps(p))
+ def parseMessage(body):
+    return json.loads(body)
 
- def publish(channel):
-     limit = (random.randint(50, 100))
-     amounts = [int(limit / 2 * random.random()) for i in xrange(4)]
-     pr = create_purchase_request(limit)
-     publish_purchase_request(channel, pr)
-     order_id = pr['id']
-     for a in amounts:
-          p = create_purchase(order_id, a)
-          publish_purchase(channel, p)
+ def publishPurchase(event):
+   """Set routing_key 'purchase' and publish the event
+      to the Aldebaran.Purchase exchange.
+   """
+   return True
+
+ def publishPurchaseRequest(event):
+   """Set routing_key 'puchase_request' and publish the event 
+      to the Aldebaran.Purchase_Request exchange.
+   """
+   return True
+
+ def callback(channel, method_frame, header_frame, body):
+ #  print "method_frame: %s" % (method_frame, )
+ #  print "header_frame: %s" % (header_frame, )
+ #  print "body: %s" % (body, )
+   event = parseMessage(body)
+ #  print "body parsed: %s" % (event, )
+   print "Is purchase event: %s" % (isPurchaseEvent(event), )
+   if isPurchaseEvent(event):
+     publishToPurchaseExchange(event)
+   else:
+     publishToPurchaseRequestExchange(event)
+   channel.basic_ack(method_frame.delivery_tag)
 
  def main():
-     parser = argparse.ArgumentParser(
-              description='Loop sending events to RabbitMq with at a rate of 1Hz.')
-     parser.add_argument('-s', metavar='rabbitmq', default='localhost',
-                         help='The IP or DNS name of the RabbitMq server')
-     args = parser.parse_args()
-     myrabbit = args.s
-     # connect to RabbitMq
-     try:
-         connection = pika.BlockingConnection(
-                      pika.ConnectionParameters(host=myrabbit,heartbeat_interval=20))
-     except Exception as err:
-         print('Cant connect to RabbitMq. Reason: %s' % err)
-         exit(1)
-     channel = connection.channel()
-     print 'Sending event to RabbitMq server. To exit press CTRL+C.'
-     while ( 1 ):
-         publish(channel)
-         time.sleep( 1 )
-     channel.close()
-     connection.close()
-
+   parser = argparse.ArgumentParser(
+            description='Consume Trade Data and route to appropriate exchanges.')
+   parser.add_argument('-s', metavar='rabbitmq', default='localhost',
+                       help='The IP or DNS name of the RabbitMq server')
+   args = parser.parse_args()
+   myrabbit = args.s
+   # connect to RabbitMq
+   try:
+     connection = pika.BlockingConnection(
+                  pika.ConnectionParameters(host=myrabbit,heartbeat_interval=20))
+   except Exception as err:
+     print('Cant connect to RabbitMq. Reason: %s' % err)
+     exit(1)
+   channel = connection.channel()
+   print ' [*] Waiting for events. To exit press CTRL+C'
+   channel.basic_consume(callback, queue='Aldebaran.Trade_Data', no_ack=False)
+   channel.start_consuming()
 
  if __name__ == "__main__":
-     main()
+   main()
  #+END_SRC
+
+ At this point we realized that we might loose messages on the Purchase
+ exchange if the Book Manager hasn't setup the queue and binding for a
+ book yet. We will need rework the design to remedy that.
+
+** Iteration 4
+
 
 
 * Open Questions
