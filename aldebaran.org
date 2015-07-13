@@ -1048,7 +1048,7 @@ if __name__ == "__main__":
 1. What's the easiest way to cleanup the queues once the book dies and
    is no longer subscribed?
 
-
+   
 * Open Questions
 - Scaling Up
 - Resilience
